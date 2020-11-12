@@ -33,6 +33,28 @@ func main() {
 		logger.Error("Could not create HTTP subscriber", err, nil)
 	}
 
+	topic1, _ := httpSubscriber.Subscribe(context.Background(), "/topic1")
+	go func() {
+		for msg := range topic1 {
+			logger.Info("Received message", watermill.LogFields{
+				"UUID": msg.UUID,
+				"Payload": string(msg.Payload),
+			})
+			msg.Ack()
+		}
+	}()
+
+	topic2, _ := httpSubscriber.Subscribe(context.Background(), "/topic2")
+	go func() {
+		for msg := range topic2 {
+			logger.Info("Received message", watermill.LogFields{
+				"UUID": msg.UUID,
+				"Payload": string(msg.Payload),
+			})
+			msg.Nack()
+		}
+	}()
+
 	r, err := message.NewRouter(
 		message.RouterConfig{},
 		logger,
@@ -54,9 +76,10 @@ func main() {
 	)
 	// Run router asynchronously
 	go r.Run(context.Background())
-
 	// Check if router is running then start HTTP server
 	<-r.Running()
+
+	logger.Info("Starting HTTP server", nil)
 	err = httpSubscriber.StartHTTPServer()
 	if err != nil {
 		logger.Error("Could not start HTTP server", err, nil)
